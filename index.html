@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Kalandorok Táborhelye</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-alap">
+    <div id="fire-container" class="particle-container rejtett"></div>
+    <div id="defeat-container" class="particle-container rejtett"></div>
+
+    <div id="fazis-jelzo" class="fazis-bar rejtett">
+        <span id="fazis-szoveg">Várakozás a játékosokra...</span>
+        <button id="kor-vege-gomb" class="hit-btn" onclick="kovetkezoFazis()" style="margin-left: 15px; width: auto; padding: 8px 15px;">Kör Vége ⏭️</button>
+    </div>
+
+    <h1>🗡️ Kalandorok Táborhelye</h1>
+
+    <div id="kezdokepernyo" class="szoba">
+        <h2>Csatlakozás a játékhoz</h2>
+        <button class="menu-gomb" onclick="megnyitSetup('vandor')">
+            🛡️ Vándor vagyok (<span id="vandor-szamlalo">0</span>/4)
+        </button>
+        <button class="menu-gomb" onclick="megnyitSetup('kronikas')">
+            👁️ Krónikás vagyok (<span id="kronikas-szamlalo">0</span>/1)
+        </button>
+        <button class="menu-gomb" style="background: linear-gradient(to right, #27ae60, #2ecc71); margin-top: 30px;" onclick="megnyitGyakorloter()">
+            ⚔️ Vándor Gyakorlótér (Offline)
+        </button>
+        <button class="menu-gomb" style="background: linear-gradient(to right, #8e44ad, #9b59b6);" onclick="megnyitKronikasGyakorloter()">
+            👁️ Krónikás Gyakorlótér (Offline)
+        </button>
+        <button class="menu-gomb rejtett" onclick="jatekReseteles()">
+            ♻️ Beragadt Játék Törlése (Reset)
+        </button>
+    </div>
+
+    <div id="setup-vandor" class="szoba rejtett">
+        <h2>Vándor Karakterlap</h2>
+        <div class="selection-area">
+            <label>Beceneved: </label>
+            <input type="text" id="nickname-input" placeholder="Pl. Csonttörő"><br><br>
+            
+            <label>Válassz hőst: </label>
+            <div id="hero-select-visual" class="visual-select">
+                <button type="button" class="select-btn active" data-value="barbar" onclick="vizualisValasztas('hero-select', 'barbar')">Barbár</button>
+                <button type="button" class="select-btn" data-value="orgyilkos" onclick="vizualisValasztas('hero-select', 'orgyilkos')">Orgyilkos</button>
+                <button type="button" class="select-btn" data-value="lovag" onclick="vizualisValasztas('hero-select', 'lovag')">Lovag</button>
+                <button type="button" class="select-btn" data-value="varazslo" onclick="vizualisValasztas('hero-select', 'varazslo')">Varázsló</button>
+            </div>
+            <select id="hero-select" style="display: none;">
+                <option value="barbar">Barbár</option>
+                <option value="orgyilkos">Orgyilkos</option>
+                <option value="lovag">Lovag</option>
+                <option value="varazslo">Varázsló</option>
+            </select>
+            
+            <p style="color: #f1c40f; margin-top: 20px;">Játék nehézsége: <span id="aktualis-nehezseg-kiir">Várakozás a Krónikásra...</span></p>
+            
+            <button onclick="csatlakozasVandorkent()" style="background: #27ae60; color: white; width: 100%; font-size: 18px; margin-top: 20px;">Készen állok! Belépés ⚔️</button>
+            <button class="vissza-gomb" style="margin-top: 15px;" onclick="visszaAMenube()">Mégse</button>
+        </div>
+    </div>
+
+    <div id="setup-kronikas" class="szoba rejtett">
+        <h2>A Sötétség Ura</h2>
+        <div class="selection-area">
+            <label>Főellenség: </label>
+            <div id="kronikas-select-visual" class="visual-select">
+                <button type="button" class="select-btn active" data-value="ido" onclick="vizualisValasztas('kronikas-select', 'ido')">Idő mágus</button>
+                <button type="button" class="select-btn" data-value="lelek" onclick="vizualisValasztas('kronikas-select', 'lelek')">Lélek gyűjtő</button>
+                <button type="button" class="select-btn" data-value="mester" onclick="vizualisValasztas('kronikas-select', 'mester')">Holtak mestere</button>
+                <button type="button" class="select-btn" data-value="ver" onclick="vizualisValasztas('kronikas-select', 'ver')">Vér harcos</button>
+            </div>
+            <select id="kronikas-select" style="display: none;">
+                <option value="ido">Idő mágus</option>
+                <option value="lelek">Lélek gyűjtő</option>
+                <option value="mester">Holtak mestere</option>
+                <option value="ver">Vér harcos</option>
+            </select>
+
+            <label style="margin-top: 15px; display: block;">Játékosok száma: </label>
+            <div id="vandorok-szama-visual" class="visual-select">
+                <button type="button" class="select-btn active" data-value="1" onclick="vizualisValasztas('vandorok-szama', '1')">1 Vándor (1v1)</button>
+                <button type="button" class="select-btn" data-value="2" onclick="vizualisValasztas('vandorok-szama', '2')">2 Vándor</button>
+                <button type="button" class="select-btn" data-value="3" onclick="vizualisValasztas('vandorok-szama', '3')">3 Vándor</button>
+                <button type="button" class="select-btn" data-value="4" onclick="vizualisValasztas('vandorok-szama', '4')">4 Vándor</button>
+            </div>
+            <select id="vandorok-szama" style="display: none;">
+                <option value="1">1 Vándor</option><option value="2">2 Vándor</option><option value="3">3 Vándor</option><option value="4">4 Vándor</option>
+            </select>
+
+            <label style="margin-top: 15px; display: block;">Globális Nehézség: </label>
+            <div id="jatek-nehezseg-visual" class="visual-select row-3">
+                <button type="button" class="select-btn active" data-value="konnyu" onclick="vizualisValasztas('jatek-nehezseg', 'konnyu')">Könnyű</button>
+                <button type="button" class="select-btn" data-value="kozepes" onclick="vizualisValasztas('jatek-nehezseg', 'kozepes')">Közepes</button>
+                <button type="button" class="select-btn" data-value="nehez" onclick="vizualisValasztas('jatek-nehezseg', 'nehez')">Nehéz</button>
+            </div>
+            <select id="jatek-nehezseg" style="display: none;">
+                <option value="konnyu">Könnyű</option><option value="kozepes">Közepes</option><option value="nehez">Nehéz</option>
+            </select>
+            
+            <button onclick="csatlakozasKronikaskent()" style="background: #c0392b; color: white; width: 100%; font-size: 18px; margin-top: 25px;">Játék Indítása 👁️</button>
+            <button class="vissza-gomb" style="margin-top: 15px;" onclick="visszaAMenube()">Mégse</button>
+        </div>
+    </div>
+
+    <div id="kozos-csapat-panel" class="szoba rejtett" style="margin-top: 15px;">
+        <h3 style="color: #3498db;">🛡️ A Kalandorok Csapata</h3>
+        <div id="csapat-terulet" class="monster-area"></div>
+        <hr style="border-color: #333;">
+    </div>
+
+    <div id="vandor-felulet" class="szoba rejtett">
+        <div class="character-card">
+            <h3 id="display-nickname">Névtelen</h3>
+            <img id="hero-image" src="barbar.jpg" alt="Hős képe">
+            <h2 id="hero-name">Barbár</h2>
+            <p>Életerő (HP): <span id="hp-display">30</span></p>
+            <input type="number" id="hp-input" value="0" min="0"><br>
+            <button class="dmg-btn" onclick="sebzodes()">- Sebződés</button>
+            <button class="gyogyito-gomb" onclick="gyogyulas()">+ Gyógyulás</button>
+            <hr style="margin: 15px 0; border-color: #2c3e50;">
+            <button id="hero-ability-btn" class="special-ability-btn" onclick="hasznalKepesseg()">Hős Képessége (1x)</button>
+            <button onclick="kepessegUjratolt()" style="background-color: transparent; border: 1px solid #7f8c8d; padding: 5px; font-size: 12px;">🔄 Újratöltés</button>
+        </div>
+
+        <div class="buff-panel">
+            <h3>🃏 Speciális Kártyák</h3>
+            <button class="buff-btn" id="buff-düh" onclick="aktiválBuff('düh')">🔥 Az ősök dühe (+8 DM)</button>
+            <button class="buff-btn" id="buff-körvény" onclick="aktiválBuff('körvény')">🌪️ Árnyékörvény (terület)</button>
+            <button class="buff-btn" id="buff-pajzs" onclick="aktiválBuff('pajzs')">🛡️ Oroszlánpajzs (-4 HP)</button>
+            <button class="buff-btn" id="buff-angyal" onclick="aktiválBuff('angyal')">👼 Angyalok akarata</button>
+        </div>
+
+        <div class="attack-panel">
+            <h3>⚔️ Támadás Kiszámítása</h3>
+            <button class="atk-btn" onclick="kivalasztTamadas(7)">Lvl 1 (7 DM)</button>
+            <button class="atk-btn" onclick="kivalasztTamadas(10)">Lvl 2 (10 DM)</button>
+            <button class="atk-btn" onclick="kivalasztTamadas(14)">Lvl 3 (14 DM)</button>
+            <p>Erősítő bónusz: <input type="number" id="erosite-input" value="0" style="width: 50px;"></p>
+            <button class="hit-btn" onclick="kivalasztTalalat(1)">Teljes (100%)</button>
+            <button class="hit-btn" onclick="kivalasztTalalat(0.5)">Gyenge (50%)</button>
+            <button class="hit-btn" onclick="kivalasztTalalat(0)">Mellé (0%)</button>
+            <h4 style="color: #f1c40f;">Ütés ereje: <span id="kiszamolt-sebzes">0</span> DM</h4>
+        </div>
+        
+        <hr style="border-color: #8e44ad;">
+        <div id="vandor-boss-terulet" class="character-card kronikas-card rejtett" style="margin-top: 20px;">
+            <h3 style="color: #8e44ad; margin-top: 0;">👁️ A Sötétség Ura</h3>
+            <img id="vandor-lato-boss-kep" src="ido.jpg" alt="Boss" style="width: 100px; height: 100px;">
+            <h4 id="vandor-lato-boss-nev" style="color: #ecf0f1; margin: 10px 0; font-size: 1.4em;">Ismeretlen</h4>
+            <p style="font-size: 1.2em; margin-bottom: 15px;">❤️ HP: <span id="vandor-lato-boss-hp" style="color: #9b59b6; font-weight: bold; font-size: 1.5em;">0</span> <span id="vandor-lato-boss-pancel" style="color: #bdc3c7; font-size: 0.9em; margin-left: 10px; font-weight: bold;"></span></p>
+            <button id="boss-tamadas-gomb" onclick="vandorUtiABosst()" class="dmg-btn" style="width: 90%; background: #555; cursor: not-allowed;">🔒 Krónikás védve</button>
+        </div>
+        <hr>
+        
+        <div id="vandor-szorny-terulet" class="monster-area"></div>
+    </div>
+
+    <div id="kronikas-felulet" class="szoba rejtett">
+        <div class="summon-panel">
+            <button class="summon-btn" onclick="szornyIdezes(1)">+ Lvl 1</button>
+            <button class="summon-btn" onclick="szornyIdezes(2)">+ Lvl 2</button>
+            <button class="summon-btn" onclick="szornyIdezes(3)">+ Lvl 3</button>
+            <button onclick="szornyTorles()" style="background: darkred; margin-left: 10px;">Minden szörny törlése</button>
+        </div>
+
+        <div id="kronikas-szorny-terulet" class="monster-area"></div>
+        <hr>
+
+        <div class="character-card kronikas-card">
+            <img id="kronikas-image" src="ido.jpg" alt="Krónikás">
+            <h2 id="kronikas-name">Idő mágus</h2>
+            <p>HP: <span id="kronikas-hp-display">80</span> <span id="kronikas-sajat-pancel" style="color: #bdc3c7; font-size: 0.9em; margin-left: 10px; font-weight: bold;"></span></p>
+            <input type="number" id="kronikas-hp-input" value="0">
+            <button class="gyogyito-gomb" onclick="kronikasGyogyulas()">+ Gyógyulás</button>
+        </div>
+        <div id="kezdemenyezes-panel" class="buff-panel" style="border-color: #3498db;">
+            <h3 style="color: #3498db; margin-top: 0;">🎲 Ki kezdi a harcot?</h3>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="harcKezdete('hos')" style="background: #2980b9; width: 45%; font-size: 14px;">⚔️ Hősök kezdenek</button>
+                <button onclick="harcKezdete('kronikas')" style="background: #8e44ad; width: 45%; font-size: 14px;">👁️ Krónikás kezd</button>
+            </div>
+        </div>
+        
+        <button id="vegso-harc-gomb" onclick="inditVegsoHarcot()" style="background: #e67e22; width: 100%; max-width: 400px; margin: 15px auto; display: block; border: 2px solid #d4af37; padding: 15px; font-weight: bold; font-size: 18px;">
+            ➡️ Végső Harc Indítása
+        </button>
+        
+        <div class="buff-panel">
+            <h3>🃏 Krónikás Erősítő Lapjai (1x)</h3>
+            <button class="buff-btn" id="buff-heal" onclick="bossBuff('gyogyulas')">🩸 Sötét Rituálé (+10 HP)</button>
+            <button class="buff-btn" id="buff-sebzes" onclick="bossBuff('sebzes')">🔥 Pokoli Erő (+5 Sebzés)</button>
+            <button class="buff-btn" id="buff-elopajzs" onclick="bossBuff('elopajzs')">🛡️ Szörny megidézése (Élő pajzs)</button>
+        </div>
+
+        <div class="boss-attack-panel">
+            <h3>🔥 Boss Támadás</h3>
+            D12: <input type="number" id="boss-d12-input" value="0" style="width: 50px;">
+            <div style="margin-top: 10px;">
+                <button class="hit-btn" onclick="bossSimaTamadas()">Sima</button>
+                <button class="hit-btn" onclick="bossGyengeTamadas()">Gyenge (50%)</button>
+                <button class="hit-btn" id="boss-aoe-btn" onclick="bossTeruletiSebzes()">🔮 Terület (1x)</button>
+                <button class="hit-btn" onclick="bossBrutalisUtes()">⚔️ Brutális (+7)</button>
+            </div>
+            <h4 style="color: #e74c3c;">Sebzés: <span id="boss-kiszamolt-sebzes">0</span></h4>
+        </div>
+        
+        <div id="kihivas-panel" class="buff-panel rejtett" style="border-color: #e74c3c;">
+            <h3 style="color: #e74c3c;">🔥 Végső Kihívás Aktív!</h3>
+            <p id="kihivas-leiras" style="color: #f1c40f; font-weight: bold;"></p>
+            <div id="ures-ut-tarolo" class="rejtett">
+                <h2 id="utSzamlalo" style="font-size: 2em; margin: 10px 0;">0 / 15</h2>
+                <input type="text" id="kartyKod" placeholder="# Kód (pl. #4)">
+                <button onclick="kodHozzaadasa()" class="dmg-btn" style="width: 80%;">Kód Hozzáadása</button>
+            </div>
+            <button id="bundas-gomb" onclick="kihivasTeljesitve()" class="rejtett gyogyito-gomb" style="width: 90%; background: #9b59b6;">🐺 Megtaláltuk a Bundást!</button>
+        </div>
+    </div>
+
+    <div id="eredmenyAblak" class="szoba rejtett popup-ablak">
+        <h2 id="eredmenyCim" style="color: #d4af37;"></h2>
+        <p id="eredmenySzoveg" style="font-style: italic; margin-bottom: 20px; font-size: 1.1em;"></p>
+        <div id="gombPanel"></div>
+    </div>
+
+    <div id="gyakorloter-panel" class="szoba rejtett">
+        <h2>⚔️ Harci Gyakorlótér</h2>
+        <div class="selection-area" style="text-align: left; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 10px; border: 1px solid #2ecc71;">
+            <p id="tutorial-uzenet" style="color: #f1c40f; font-weight: bold; text-align: center; font-size: 1.2em;">
+                1. Lépés: Válaszd ki a kártyád szintjét (Lvl 1, 2 vagy 3)!
+            </p>
+            <div class="attack-panel" style="margin-top: 20px;">
+                <h3>Támadás Kiszámítása</h3>
+                <button class="atk-btn" onclick="tutKivalasztTamadas(7)">Lvl 1 (7 DM)</button>
+                <button class="atk-btn" onclick="tutKivalasztTamadas(10)">Lvl 2 (10 DM)</button>
+                <button class="atk-btn" onclick="tutKivalasztTamadas(14)">Lvl 3 (14 DM)</button>
+                <div style="margin-top: 15px;">
+                    <button class="hit-btn" onclick="tutKivalasztTalalat(1)">Teljes (100%)</button>
+                    <button class="hit-btn" onclick="tutKivalasztTalalat(0.5)">Gyenge (50%)</button>
+                </div>
+                <h4 style="color: #f1c40f;">Ütés ereje: <span id="tut-kiszamolt-sebzes">0</span> DM</h4>
+            </div>
+            <hr>
+            <div class="monster-area" style="display: flex; justify-content: center;">
+                <div class="monster-card" style="width: 200px; text-align: center;">
+                    <h4>Gyakorló Bábu</h4>
+                    <p>❤️ HP: <span id="tut-szorny-hp">25</span></p>
+                    <button onclick="tutSzornySebzodes()" class="dmg-btn" style="width:100%; margin: 10px 0 0 0;">⚔️ Ütés</button>
+                </div>
+            </div>
+        </div>
+        <button class="menu-gomb" onclick="visszaAMenube()">Vissza a főmenübe</button>
+    </div>
+
+    <div id="gyakorloter-kronikas-panel" class="szoba rejtett">
+        <h2>👁️ A Sötétség Ura - Gyakorlótér</h2>
+        <div class="selection-area" style="text-align: left; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 10px; border: 1px solid #8e44ad;">
+            <p id="tut-kronikas-uzenet" style="color: #f1c40f; font-weight: bold; text-align: center; font-size: 1.2em;">
+                1. Lépés: Idézz meg egy szörnyet a pályára a lenti gombokkal!
+            </p>
+            <div class="summon-panel" style="text-align: center; margin-bottom: 20px;">
+                <button class="summon-btn" onclick="tutSikeresIdezes(1)">+ Lvl 1</button>
+                <button class="summon-btn" onclick="tutSikeresIdezes(2)">+ Lvl 2</button>
+                <button class="summon-btn" onclick="tutSikeresIdezes(3)">+ Lvl 3</button>
+            </div>
+            <div class="boss-attack-panel" style="margin-top: 20px;">
+                <h3>🔥 Boss Támadás</h3>
+                <p style="font-size: 14px; color: #aaa;">Dobj a fizikai D12 kockával, és írd be az eredményt!</p>
+                D12: <input type="number" id="tut-boss-d12" value="0" style="width: 60px;">
+                <div style="margin-top: 10px;">
+                    <button class="hit-btn" onclick="tutSzamolBoss(0)">Sima</button>
+                    <button class="hit-btn" onclick="tutSzamolBoss('terület')">🔮 Terület</button>
+                    <button class="hit-btn" onclick="tutSzamolBoss(7)">⚔️ Brutális (+7)</button>
+                </div>
+                <h4 style="color: #e74c3c;">Kiszámolt Sebzés: <span id="tut-boss-kiszamolt">0</span></h4>
+            </div>
+            <hr>
+            <h3 style="color: #3498db; text-align: center;">Vándorok (Célpontok)</h3>
+            <div class="monster-area" style="display: flex; justify-content: center;">
+                <div class="player-card" style="width: 200px; text-align: center;">
+                    <h4>Gyakorló Vándor</h4>
+                    <p>❤️ HP: <span id="tut-dummy-hos-hp">35</span></p>
+                    <button onclick="tutKronikasUt()" style="background: darkred; width: 100%; padding: 5px; margin-top: 5px; font-size: 14px; border: 1px solid #ff4d4d;">⚔️ Sebzés kiosztása</button>
+                </div>
+            </div>
+        </div>
+        <button class="menu-gomb" onclick="visszaAMenube()">Vissza a főmenübe</button>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+    document.addEventListener('keydown', function(event) {
+        if (event.shiftKey && (event.key === 'R' || event.key === 'r')) {
+            jatekReseteles(); 
+            alert("Rendszer üzenet: Beragadt játék sikeresen törölve!"); 
+        }
+    });
+    </script>
+</body>
+</html>
