@@ -121,10 +121,13 @@
             <h3 id="display-nickname">Névtelen</h3>
             <img id="hero-image" src="barbar.jpg" alt="Hős képe">
             <h2 id="hero-name">Barbár</h2>
-            <p>Életerő (HP): <span id="hp-display">30</span></p>
+            <p>Életerő (HP): <span id="hp-display">30</span> <span id="vandor-passziv-pancel" style="color: #bdc3c7; font-size: 0.8em; margin-left: 10px; font-weight: bold;"></span></p>
             <input type="number" id="hp-input" value="0" min="0"><br>
             <button class="dmg-btn" onclick="sebzodes()">- Sebződés</button>
             <button class="gyogyito-gomb" onclick="gyogyulas()">+ Gyógyulás</button>
+
+            <p id="csapda-kijelzo" class="rejtett" style="color: #e74c3c; font-weight: bold; font-size: 16px; margin-top: 15px; background: rgba(200,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid #e74c3c;"></p>
+            
             <hr style="margin: 15px 0; border-color: #2c3e50;">
             <button id="hero-ability-btn" class="special-ability-btn" onclick="hasznalKepesseg()">Hős Képessége (1x)</button>
             <button onclick="kepessegUjratolt()" style="background-color: transparent; border: 1px solid #7f8c8d; padding: 5px; font-size: 12px;">🔄 Újratöltés</button>
@@ -198,6 +201,12 @@
             <button class="buff-btn" id="buff-heal" onclick="bossBuff('gyogyulas')">🩸 Sötét Rituálé (+10 HP)</button>
             <button class="buff-btn" id="buff-sebzes" onclick="bossBuff('sebzes')">🔥 Pokoli Erő (+5 Sebzés)</button>
             <button class="buff-btn" id="buff-elopajzs" onclick="bossBuff('elopajzs')">🛡️ Szörny megidézése (Élő pajzs)</button>
+        </div>
+
+        <div class="buff-panel" style="border-color: #e74c3c;">
+            <h3 style="color: #e74c3c;">🪤 Krónikás Csapdái</h3>
+            <button class="dmg-btn" onclick="elsutCsapda()" style="width: 90%; margin-bottom: 10px;">🪤 1. Csapda (-10 HP azonnal)</button>
+            <button class="hit-btn" onclick="elsutVerzesCsapda()" style="width: 90%; background: darkred;">🩸 2. Csapda (-2 HP a harcok elején)</button>
         </div>
 
         <div class="boss-attack-panel">

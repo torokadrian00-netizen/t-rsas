@@ -9,6 +9,9 @@ let enVagyokAKronikas = false;
 let utolsoBossSebzes = 0;
 let vegsoHarcAktiv = false; 
 
+// VÉRZÉS CSAPDA VÁLTOZÓ
+let globalVerzesAtok = 0; 
+
 let globalisNehezseg = "konnyu";
 let vandorokSzama = "2";
 let onlineVandorokSzama = 0;
@@ -31,7 +34,64 @@ let kivalasztottAlap = 0, veglegesSebzes = 0, kepessegHasznalva = false;
 let duhAktiv = false, pajzsErtek = 0, korvenyAktiv = false, bossExtraSebzes = 0;
 let db = null;
 
-// --- FÁZISJELZŐ LOGIKA (A, B, C, D RENDSZER) ---
+// --- CSAPDA MECHANIKÁK ---
+
+function elsutCsapda() {
+    if (!enVagyokAKronikas) return;
+    let biztos = confirm("Biztosan elsütöd a 10 HP-s Csapdát? Minden hős kap azonnal 10 sebzést!");
+    if (!biztos) return;
+
+    let frissitesek = {};
+    for (let id in csapattagok) {
+        let jatekos = csapattagok[id];
+        let h_hp = jatekos.hp;
+        if (h_hp > 0) {
+            let h_pajzs = typeof jatekos.pajzs === "number" ? jatekos.pajzs : (jatekos.pajzs ? 4 : 0);
+            
+            let levon = 10;
+            if (h_pajzs > 0) {
+                if (levon >= h_pajzs) { levon -= h_pajzs; h_pajzs = 0; } 
+                else { h_pajzs -= levon; levon = 0; }
+            }
+            h_hp = Math.max(0, h_hp - levon);
+
+            frissitesek["gameState/vandorok/" + id + "/hp"] = h_hp;
+            frissitesek["gameState/vandorok/" + id + "/pajzs"] = h_pajzs;
+        }
+    }
+    
+    if (db) db.ref().update(frissitesek);
+    alert("🪤 1. Csapda elsütve! Mindenki sebződött 10-et.");
+}
+
+function elsutVerzesCsapda() {
+    if (!enVagyokAKronikas) return;
+    let biztos = confirm("Biztosan elsütöd a Vérzés Csapdát? A következő 2 harc elején minden hős veszít 2 HP-t!");
+    if (!biztos) return;
+    
+    if (db) db.ref("gameState/verzesAtok").set(2); 
+    alert("🩸 Vérzés Csapda aktiválva! Majd az új szörnyek megidézésekor fog hatni.");
+}
+
+function automatikusVerzesLevonas() {
+    if (!enVagyokAKronikas || globalVerzesAtok <= 0) return;
+    
+    let frissitesek = {};
+    for (let id in csapattagok) {
+        let h_hp = csapattagok[id].hp;
+        if (h_hp > 0) {
+            h_hp = Math.max(0, h_hp - 2); 
+            frissitesek["gameState/vandorok/" + id + "/hp"] = h_hp;
+        }
+    }
+    frissitesek["gameState/verzesAtok"] = globalVerzesAtok - 1; 
+    
+    if (db) db.ref().update(frissitesek);
+    alert("🩸 Új harc kezdődött! A Vérzés Csapda miatt minden hős elvesztett 2 HP-t!");
+}
+
+
+// --- FÁZIS ÉS KÉPESSÉG LOGIKÁK ---
 let kronikasKivalasztottTipus = "ido"; 
 
 function getAktualisFazis() {
@@ -134,28 +194,23 @@ function kovetkezoFazis() {
         db.ref("gameState/pancelHasznalva").set(false);
     }
 }
-// --- ÚJ: KEZDEMÉNYEZÉS ÉS SORSOLÁS ---
+
 function harcKezdete(kiKezd) {
     let ujFazis = 0;
     let n = Object.keys(csapattagok).length;
     
     if (kiKezd === 'kronikas') {
-        // A Krónikás körei a páratlan számok (1, 3)
         ujFazis = 1; 
         alert("👁️ A Sötétség Ura csap le először!");
     } else {
-        // A Hősök körei a páros számok (0, 2)
         if (n === 2) {
-            // 2 hősnél véletlenszerűen sorsoljuk, hogy az "A" (0) vagy a "B" (2) hős kezd-e!
             ujFazis = Math.random() < 0.5 ? 0 : 2;
         } else {
-            // 1, 3 vagy 4 hősnél alapból a 0. fázissal indulunk
             ujFazis = 0; 
         }
         alert("⚔️ A Vándoroké az első csapás joga!");
     }
     
-    // Elküldjük a mindenkinek a kezdő fázist
     if (db) {
         db.ref("gameState/fazisSzamlalo").set(ujFazis);
         db.ref("gameState/pancelHasznalva").set(false);
@@ -280,6 +335,7 @@ function csatlakozasVandorkent() {
     enVagyokAKronikas = false;
     hp = vandorHpMatrix[globalisNehezseg];
     pajzsErtek = 0;
+    
     document.getElementById("display-nickname").innerText = nev;
     document.getElementById("hero-image").src = hos + ".jpg";
     document.getElementById("hero-name").innerText = kasztNev;
@@ -301,6 +357,9 @@ function csatlakozasVandorkent() {
 function inditVegsoHarcot() {
     let biztos = confirm("Biztosan elindítod a Végső Harcot? Ekkortól a Vándorok sebezhetik a Krónikást!");
     if (biztos && db) {
+        if (globalVerzesAtok > 0) {
+            automatikusVerzesLevonas();
+        }
         db.ref("gameState").update({ vegsoHarc: true, fazisSzamlalo: 0, pancelHasznalva: false });
         alert("⚔️ A Végső Harc elkezdődött! Indul a Taktikai Fázis!");
     }
@@ -334,16 +393,47 @@ function csatlakozasKronikaskent() {
     megjelenitCsapatot();
 }
 
+// --- BOSS ÉS VÁNDOR PÁNCÉL LOGIKÁJA ---
+function getVandorPasszivPancel() {
+    if (!vegsoHarcAktiv) return 0; 
+    if (Number(vandorokSzama) < 3) return 0; 
+    
+    if (globalisNehezseg === "kozepes") return 2;
+    if (globalisNehezseg === "nehez") return 3;
+    return 0;
+}
+
+function frissitBossPancelKijelzot() {
+    let bossArmor = 0;
+    if (Number(vandorokSzama) > 2) {
+        if (globalisNehezseg === "kozepes") bossArmor = 3;
+        if (globalisNehezseg === "nehez") bossArmor = 5;
+    }
+    let pancelSzoveg = bossArmor > 0 ? `🛡️ Páncél: ${bossArmor}` : "";
+    let vP = document.getElementById("vandor-lato-boss-pancel");
+    if(vP) vP.innerText = pancelSzoveg;
+    let kP = document.getElementById("kronikas-sajat-pancel");
+    if(kP) kP.innerText = pancelSzoveg;
+
+    let heroArmor = getVandorPasszivPancel();
+    let heroPancelSzoveg = heroArmor > 0 ? `🛡️ Páncél: ${heroArmor}` : "";
+    let heroP = document.getElementById("vandor-passziv-pancel");
+    if(heroP) heroP.innerText = heroPancelSzoveg;
+}
+
 function megjelenitCsapatot() {
     let html = "";
+    let passzivPancel = getVandorPasszivPancel();
+
     for (let id in csapattagok) {
         let jatekos = csapattagok[id];
         let kronikasGombHtml = enVagyokAKronikas ? `<button onclick="kronikasUtHoston('${id}')" style="background: darkred; width: 100%; padding: 5px; margin-top: 5px; font-size: 14px; border: 1px solid #ff4d4d;">⚔️ Sebzés</button>` : "";
         
         let pE = typeof jatekos.pajzs === "number" ? jatekos.pajzs : (jatekos.pajzs ? 4 : 0);
         let pajzsIkon = pE > 0 ? ` 🛡️(${pE})` : "";
+        let passzivIkon = passzivPancel > 0 ? ` ⚙️[+${passzivPancel}]` : ""; 
 
-        html += `<div class="player-card"><h4>${jatekos.nev}${pajzsIkon}</h4><p>❤️ HP: <strong>${jatekos.hp}</strong></p><p style="font-size: 10px; color: #aaa;">(${jatekos.kaszt})</p>${kronikasGombHtml}</div>`;
+        html += `<div class="player-card"><h4>${jatekos.nev}${pajzsIkon}${passzivIkon}</h4><p>❤️ HP: <strong>${jatekos.hp}</strong></p><p style="font-size: 10px; color: #aaa;">(${jatekos.kaszt})</p>${kronikasGombHtml}</div>`;
     }
     document.getElementById("csapat-terulet").innerHTML = html;
     frissitFazisKijelzot();
@@ -354,7 +444,10 @@ function kronikasUtHoston(hosId) {
     if (utolsoBossSebzes === 0) { alert("Előbb válaszd ki a sebzést!"); return; }
 
     let jatekosPajzs = typeof jatekos.pajzs === "number" ? jatekos.pajzs : (jatekos.pajzs ? 4 : 0);
-    let tenylegesSebzes = utolsoBossSebzes;
+    let passzivPancel = getVandorPasszivPancel(); 
+    
+    let tenylegesSebzes = utolsoBossSebzes - passzivPancel;
+    if (tenylegesSebzes < 0) tenylegesSebzes = 0;
 
     if (jatekosPajzs > 0) {
         if (tenylegesSebzes >= jatekosPajzs) {
@@ -378,6 +471,13 @@ function kronikasUtHoston(hosId) {
 function sebzodes() {
     let levon = Number(document.getElementById("hp-input").value);
     
+    let passzivPancel = getVandorPasszivPancel();
+    if (passzivPancel > 0 && levon > 0) {
+        levon -= passzivPancel;
+        if (levon < 0) levon = 0;
+        alert(`🛡️ A passzív páncélod felfogott ${passzivPancel} sebzést a támadásból!`);
+    }
+
     if (pajzsErtek > 0) {
         if (levon >= pajzsErtek) {
             levon -= pajzsErtek;
@@ -429,6 +529,12 @@ function kivalasztTalalat(szorzo) {
     let bonusz = Number(document.getElementById("erosite-input").value || 0);
     let alap = Math.floor((kivalasztottAlap + bonusz) * szorzo);
     if (duhAktiv) { alap += 8; duhAktiv = false; document.getElementById("buff-düh").classList.remove("buff-aktiv"); }
+    
+    if (globalVerzesAtok > 0) {
+        alap -= 2;
+        if (alap < 0) alap = 0; 
+    }
+    
     veglegesSebzes = alap;
     document.getElementById("kiszamolt-sebzes").innerText = veglegesSebzes;
 }
@@ -436,6 +542,11 @@ function kivalasztTalalat(szorzo) {
 function szornyIdezes(szint) {
     let maxSzorny = Number(vandorokSzama) + 1;
     if (szornyek.length >= maxSzorny) { alert("Maximum " + maxSzorny + " szörny lehet a pályán!"); return; }
+    
+    if (szornyek.length === 0 && globalVerzesAtok > 0) {
+        automatikusVerzesLevonas();
+    }
+
     szornyek.push({ id: Date.now(), szint: szint, hp: szornyHpMatrix[globalisNehezseg][szint] });
     
     if (db) db.ref("gameState/szornyek").set(szornyek);
@@ -444,7 +555,6 @@ function szornyIdezes(szint) {
 
 function megjelenitSzornyeket() {
     let html = "";
-    
     let biztonsagosSzornyLista = [];
     if (Array.isArray(szornyek)) {
         biztonsagosSzornyLista = szornyek.filter(sz => sz !== null);
@@ -505,7 +615,6 @@ function kronikasSebzodes() {
 
 function kronikasGyogyulas() { kronikasHp += Number(document.getElementById("kronikas-hp-input").value); document.getElementById("kronikas-hp-display").innerText = kronikasHp; document.getElementById("kronikas-hp-input").value = 0; if (db) db.ref("gameState").update({ kronikasHp: kronikasHp }); }
 
-// --- ÚJ PÁNCÉL LOGIKA BEÉPÍTÉSE ---
 function vandorUtiABosst() {
     if (enVagyokAKronikas) return;
     if (veglegesSebzes === 0) { alert("Előbb válassz támadást és dobj kockával!"); return; }
@@ -516,7 +625,6 @@ function vandorUtiABosst() {
     if (vanHarmasSzorny && !korvenyAktiv) { alert("🛡️ Egy 3-as szintű szörny védi a Krónikást! Előbb őt kell legyőznöd, vagy használj Területi sebzést (Árnyékörvény)!"); return; }
 
     let armor = 0;
-    // ÁLLANDÓ PÁNCÉL: Minden ütésnél véd, ha 2 vagy több játékos van!
     if (Number(vandorokSzama) > 1) {
         if (globalisNehezseg === "kozepes") armor = 3;
         if (globalisNehezseg === "nehez") armor = 5;
@@ -533,7 +641,6 @@ function vandorUtiABosst() {
         if (armor > 0 && veglegesSebzes > 0) {
             let uzi = tenylegesSebzes > 0 ? `A Krónikás passzív páncélja felfogott ${armor} sebzést! (Ténylegesen bevitt: ${tenylegesSebzes})` : `A Krónikás masszív páncélja felfogta a teljes támadást!`;
             alert(`🛡️ ${uzi}`);
-            // Nincs több "pancelHasznalva" blokkolás, mindig véd!
         }
 
         if (korvenyAktiv && szornyek.length > 0) {
@@ -585,7 +692,6 @@ function vizualisValasztas(selectId, ertek) {
     if (kivalasztottGomb) kivalasztottGomb.classList.add("active");
 }
 
-// --- ÚJ KRÓNIKÁS 1X KÁRTYA LOGIKA ---
 function bossBuff(tipus) {
     if (tipus === 'gyogyulas') {
         if (kronikasKeszsegek.heal) { alert("Ezt már elhasználtad!"); return; }
@@ -746,7 +852,6 @@ try {
     });
     db.ref("gameState/kronikasJelenlet").on("value", (snap) => { kronikasOnline = snap.val() ? true : false; let k = document.getElementById("kronikas-szamlalo"); if (k) k.innerText = kronikasOnline ? "1" : "0"; });
     
-    // --- ÚJ: AUTOMATIKUS ÜRES SZOBA RESET ---
     db.ref("gameState").on("value", (snap) => {
         let state = snap.val();
         if (state !== null) {
@@ -762,7 +867,6 @@ try {
             }
         }
     });
-    // ----------------------------------------
 
     db.ref("gameState/vegsoHarc").on("value", (snap) => {
         vegsoHarcAktiv = snap.val() || false;
@@ -774,6 +878,7 @@ try {
         }
         
         frissitFazisKijelzot();
+        frissitBossPancelKijelzot();
 
         let gomb = document.getElementById("vegso-harc-gomb");
         if (gomb) {
@@ -885,6 +990,20 @@ try {
                 }
             }
             ellenorizJatekVege();
+        }
+    });
+
+    db.ref("gameState/verzesAtok").on("value", (snap) => {
+        globalVerzesAtok = snap.val() || 0;
+        
+        let v_kijelzo = document.getElementById("csapda-kijelzo");
+        if (v_kijelzo) {
+            if (globalVerzesAtok > 0 && !enVagyokAKronikas) {
+                v_kijelzo.classList.remove("rejtett");
+                v_kijelzo.innerText = `🩸 Vérzés aktív: ${globalVerzesAtok} harc maradt (-2 HP és -2 DM a harcokban)`;
+            } else {
+                v_kijelzo.classList.add("rejtett");
+            }
         }
     });
 
@@ -1039,21 +1158,4 @@ if (typeof firebase !== 'undefined') {
             }
         });
     }, 1500); 
-}
-
-// --- BOSS PÁNCÉL KIJELZŐ FRISSÍTÉSE ---
-function frissitBossPancelKijelzot() {
-    let armor = 0;
-    if (Number(vandorokSzama) > 2) {
-        if (globalisNehezseg === "kozepes") armor = 3;
-        if (globalisNehezseg === "nehez") armor = 5;
-    }
-    
-    let pancelSzoveg = armor > 0 ? `🛡️ Páncél: ${armor}` : "";
-    
-    let vP = document.getElementById("vandor-lato-boss-pancel");
-    if(vP) vP.innerText = pancelSzoveg;
-    
-    let kP = document.getElementById("kronikas-sajat-pancel");
-    if(kP) kP.innerText = pancelSzoveg;
 }
