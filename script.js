@@ -22,7 +22,7 @@ let pancelHasznalva = false;
 let kronikasKeszsegek = { aoe: false, heal: false, sebzes: false, pajzs: false };
 
 const vandorHpMatrix = { "konnyu": 30, "kozepes": 35, "nehez": 45 };
-const szornyHpMatrix = { "konnyu": { 1: 13, 2: 17, 3: 20 }, "kozepes": { 1: 15, 2: 20, 3: 25 }, "nehez": { 1: 20, 2: 25, 3: 30 } };
+const szornyHpMatrix = { "konnyu": { 1: 13, 2: 15, 3: 17 }, "kozepes": { 1: 17, 2: 20, 3: 25 }, "nehez": { 1: 20, 2: 25, 3: 30 } };
 const bossHpMatrix = {
     "konnyu": { "1": 50, "2": 80, "3": 110, "4": 140 },
     "kozepes": { "1": 60, "2": 90, "3": 125, "4": 160 },
