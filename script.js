@@ -77,23 +77,20 @@ function generalKazamata(nehezseg) {
 
 function renderSorsvonal() {
     const container = document.getElementById("sorsvonal-belso");
-    if (!container) return;
-    
     let kazamataContainer = document.getElementById("kazamata-container");
+    
+    if (!container || !kazamataContainer) return;
 
-    if (vegsoHarcAktiv) {
-        if (kazamataContainer) kazamataContainer.classList.add("rejtett");
+    // Ha végső harc van, VAGY a menüben vagyunk, rejtsük el a sorsvonalat!
+    let menuLatszik = !document.getElementById("kezdokepernyo").classList.contains("rejtett");
+    if (vegsoHarcAktiv || menuLatszik || terkepData.length === 0) {
+        kazamataContainer.classList.add("rejtett");
         return;
     } else {
-        if (kazamataContainer) kazamataContainer.classList.remove("rejtett");
+        kazamataContainer.classList.remove("rejtett");
     }
 
     container.innerHTML = "";
-
-    if (!terkepData || terkepData.length === 0) {
-        container.innerHTML = "<p style='color: #aaa;'>A kazamata még generálódik...</p>";
-        return;
-    }
 
     terkepData.forEach(pont => {
         let div = document.createElement("div");
@@ -101,21 +98,16 @@ function renderSorsvonal() {
         if (pont.id === aktualisLepes) div.className += " active";
         if (pont.id < aktualisLepes) div.className += " past";
 
-        let megjelenitettNev = "";
         let ikon = "";
 
+        // Csak ikont és számot generálunk, hogy beférjen a vékony sávba!
         if (enVagyokAKronikas) {
-            megjelenitettNev = pont.tabor ? "TÁBORHELY" : pont.tipus.toUpperCase();
             ikon = pont.tabor ? "⛺" : (pont.tipus === "Harc" ? "⚔️" : (pont.tipus === "Csapda" ? "🪤" : "📜"));
         } else {
-            if (pont.tabor) {
-                megjelenitettNev = "TÁBORHELY"; ikon = "⛺";
-            } else {
-                megjelenitettNev = "Ismeretlen sötétség"; ikon = "❓";
-            }
+            ikon = pont.tabor ? "⛺" : "❓";
         }
 
-        div.innerHTML = `<span class="allomas-ikon">${ikon}</span> Lépés ${pont.id}: ${megjelenitettNev}`;
+        div.innerHTML = `<span>${pont.id}. ${ikon}</span>`;
         container.appendChild(div);
     });
 

@@ -114,13 +114,13 @@
         <h3 style="color: #3498db;">🛡️ A Kalandorok Csapata</h3>
         <div id="csapat-terulet" class="monster-area"></div>
         
-        <div id="kazamata-container" style="margin-top: 20px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; border: 1px solid #555;">
-            <h3 style="color: #d4af37; margin-top: 0; margin-bottom: 15px;">🗺️ A Kazamata Útja</h3>
-            <div id="sorsvonal-belso" style="display: flex; flex-direction: column-reverse; gap: 5px;">
-                </div>
-            <div id="kronikas-vezerlo" class="rejtett" style="margin-top: 15px;">
-                <button id="btn-kovetkezo" onclick="kovetkezoAllomas()" style="background: #ff5722; color: white; border: none; padding: 10px 20px; width: 90%; font-size: 16px; border-radius: 5px; font-weight: bold; cursor: pointer;">➡️ KÖVETKEZŐ LÉPÉS</button>
-            </div>
+<div id="kazamata-container" class="rejtett">
+        <h4 style="color: #d4af37; margin: 0 0 5px 0; font-size: 10px; text-align: center;">ÚT</h4>
+        <div id="sorsvonal-belso"></div>
+        <div id="kronikas-vezerlo" class="rejtett" style="margin-top: 5px;">
+            <button id="btn-kovetkezo" onclick="kovetkezoAllomas()">➡️</button>
+        </div>
+    </div>
         </div>
         
         <hr style="border-color: #333;">
@@ -133,7 +133,6 @@
             <h2 id="hero-name">Barbár</h2>
             <p>Életerő (HP): <span id="hp-display">30</span> <span id="vandor-passziv-pancel" style="color: #bdc3c7; font-size: 0.8em; margin-left: 10px; font-weight: bold;"></span></p>
             <input type="number" id="hp-input" value="0" min="0"><br>
-            <button class="dmg-btn" onclick="sebzodes()">- Sebződés</button>
             <button class="gyogyito-gomb" onclick="gyogyulas()">+ Gyógyulás</button>
 
             <p id="csapda-kijelzo" class="rejtett" style="color: #e74c3c; font-weight: bold; font-size: 16px; margin-top: 15px; background: rgba(200,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid #e74c3c;"></p>
