@@ -22,7 +22,7 @@ let pancelHasznalva = false;
 let kronikasKeszsegek = { aoe: false, heal: false, sebzes: false, pajzs: false };
 
 const vandorHpMatrix = { "konnyu": 30, "kozepes": 35, "nehez": 45 };
-const szornyHpMatrix = { "konnyu": { 1: 7, 2: 12, 3: 20 }, "kozepes": { 1: 9, 2: 17, 3: 25 }, "nehez": { 1: 13, 2: 22, 3: 30 } };
+const szornyHpMatrix = { "konnyu": { 1: 13, 2: 17, 3: 20 }, "kozepes": { 1: 15, 2: 20, 3: 25 }, "nehez": { 1: 20, 2: 25, 3: 30 } };
 const bossHpMatrix = {
     "konnyu": { "1": 50, "2": 80, "3": 110, "4": 140 },
     "kozepes": { "1": 60, "2": 90, "3": 125, "4": 160 },
@@ -33,6 +33,106 @@ const bossExtraDmMatrix = { "konnyu": 0, "kozepes": 3, "nehez": 5 };
 let kivalasztottAlap = 0, veglegesSebzes = 0, kepessegHasznalva = false;
 let duhAktiv = false, pajzsErtek = 0, korvenyAktiv = false, bossExtraSebzes = 0;
 let db = null;
+
+// --- ÚJ: KAZAMATA SORSVONAL VÁLTOZÓK ---
+let aktualisLepes = 1;
+const maxLepes = 8;
+let terkepData = [];
+
+// --- KAZAMATA SORSVONAL LOGIKA ---
+function generalKazamata(nehezseg) {
+    let ideiglenesTerkep = [];
+    let eselyHarc, eselyCsapda;
+
+    if (nehezseg === "nehez") {
+        eselyHarc = 0.46;
+        eselyCsapda = 0.39;
+    } else {
+        eselyHarc = 0.45;
+        eselyCsapda = 0.36;
+    }
+
+    for (let i = 1; i <= maxLepes; i++) {
+        let r = Math.random();
+        let tipus = r < eselyHarc ? "Harc" : (r < eselyHarc + eselyCsapda ? "Csapda" : "Lore");
+        ideiglenesTerkep.push({ id: i, tipus: tipus, tabor: false });
+    }
+
+    if (nehezseg === "konnyu") {
+        for(let i=1; i <= maxLepes; i++) if(i % 2 === 0) ideiglenesTerkep[i-1].tabor = true;
+    } else if (nehezseg === "kozepes") {
+        ideiglenesTerkep[1].tabor = true; 
+        ideiglenesTerkep[4].tabor = true; 
+        ideiglenesTerkep[6].tabor = true; 
+    } else if (nehezseg === "nehez") {
+        ideiglenesTerkep[3].tabor = true; 
+        ideiglenesTerkep[6].tabor = true; 
+    }
+
+    if (db) {
+        db.ref("gameState/kazamataTerkep").set(ideiglenesTerkep);
+        db.ref("gameState/aktualisLepes").set(1);
+    }
+}
+
+function renderSorsvonal() {
+    const container = document.getElementById("sorsvonal-belso");
+    if (!container) return;
+    
+    let kazamataContainer = document.getElementById("kazamata-container");
+
+    if (vegsoHarcAktiv) {
+        if (kazamataContainer) kazamataContainer.classList.add("rejtett");
+        return;
+    } else {
+        if (kazamataContainer) kazamataContainer.classList.remove("rejtett");
+    }
+
+    container.innerHTML = "";
+
+    if (!terkepData || terkepData.length === 0) {
+        container.innerHTML = "<p style='color: #aaa;'>A kazamata még generálódik...</p>";
+        return;
+    }
+
+    terkepData.forEach(pont => {
+        let div = document.createElement("div");
+        div.className = "allomas";
+        if (pont.id === aktualisLepes) div.className += " active";
+        if (pont.id < aktualisLepes) div.className += " past";
+
+        let megjelenitettNev = "";
+        let ikon = "";
+
+        if (enVagyokAKronikas) {
+            megjelenitettNev = pont.tabor ? "TÁBORHELY" : pont.tipus.toUpperCase();
+            ikon = pont.tabor ? "⛺" : (pont.tipus === "Harc" ? "⚔️" : (pont.tipus === "Csapda" ? "🪤" : "📜"));
+        } else {
+            if (pont.tabor) {
+                megjelenitettNev = "TÁBORHELY"; ikon = "⛺";
+            } else {
+                megjelenitettNev = "Ismeretlen sötétség"; ikon = "❓";
+            }
+        }
+
+        div.innerHTML = `<span class="allomas-ikon">${ikon}</span> Lépés ${pont.id}: ${megjelenitettNev}`;
+        container.appendChild(div);
+    });
+
+    let kronikasVezerlo = document.getElementById("kronikas-vezerlo");
+    if (kronikasVezerlo) {
+        if (enVagyokAKronikas) kronikasVezerlo.classList.remove("rejtett");
+        else kronikasVezerlo.classList.add("rejtett");
+    }
+}
+
+function kovetkezoAllomas() {
+    if (aktualisLepes < maxLepes) {
+        if (db) db.ref("gameState/aktualisLepes").set(aktualisLepes + 1);
+    } else {
+        alert("Elértétek a folyosó végét! Indítsd el a Végső Harcot a lenti gombbal!");
+    }
+}
 
 // --- CSAPDA MECHANIKÁK ---
 
@@ -352,6 +452,8 @@ function csatlakozasVandorkent() {
         sajatRef.set({ nev: nev, hp: hp, kaszt: kasztNev, pajzs: 0 });
         sajatRef.onDisconnect().remove();
     }
+    
+    renderSorsvonal(); // <-- ITT FONTOS A SORSVONAL KIRAJZOLÁSA
 }
 
 function inditVegsoHarcot() {
@@ -389,8 +491,12 @@ function csatlakozasKronikaskent() {
         kRef.onDisconnect().remove();
         db.ref("gameState").update({ kronikasHp: kronikasHp, nehezseg: valasztottNehezseg, kivalasztottVandorokSzama: vandorokSzama, kronikasTipus: boss, fazisSzamlalo: 0 });
         db.ref("gameState/kronikasKeszsegek").set({ aoe: false, heal: false, sebzes: false, pajzs: false });
+        
+        // --- ITT FONTOS: GENERÁLÁS INDÍTÁSA ---
+        generalKazamata(valasztottNehezseg);
     }
     megjelenitCsapatot();
+    renderSorsvonal(); // <-- ITT FONTOS A SORSVONAL KIRAJZOLÁSA
 }
 
 // --- BOSS ÉS VÁNDOR PÁNCÉL LOGIKÁJA ---
@@ -846,6 +952,18 @@ try {
     });
 
     db.ref("gameState/szornyek").on("value", (snap) => { szornyek = snap.val() || []; megjelenitSzornyeket(); });
+    
+    // --- KAZAMATA FIGYELŐK (Ide is bekerültek) ---
+    db.ref("gameState/kazamataTerkep").on("value", (snap) => {
+        terkepData = snap.val() || [];
+        renderSorsvonal();
+    });
+
+    db.ref("gameState/aktualisLepes").on("value", (snap) => {
+        aktualisLepes = snap.val() || 1;
+        renderSorsvonal();
+    });
+
     db.ref("gameState/kivalasztottVandorokSzama").on("value", (snap) => { 
         if (snap.val()) vandorokSzama = snap.val(); 
         setTimeout(frissitBossPancelKijelzot, 500); 
@@ -879,6 +997,7 @@ try {
         
         frissitFazisKijelzot();
         frissitBossPancelKijelzot();
+        renderSorsvonal(); // Frissíti a sorsvonalat is, hogy eltűnjön
 
         let gomb = document.getElementById("vegso-harc-gomb");
         if (gomb) {
